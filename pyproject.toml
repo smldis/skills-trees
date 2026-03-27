@@ -7,8 +7,8 @@ name = "skills-trees"
 version = "0.1.0"
 description = "Workspace-local skills discovery, validation, and agent context generation"
 readme = "README.md"
-requires-python = ">=3.11"
-license = {text = "MIT"}
+requires-python = ">=3.10"
+license = {text = "Apache-2.0"}
 dependencies = [
   "PyYAML>=6.0"
 ]
