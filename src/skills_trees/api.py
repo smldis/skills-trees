@@ -60,7 +60,7 @@ def generate_agent_context(discovery: DiscoveryResult, config: RuntimeConfig) ->
         if node.is_valid:
             block = build_agent_context_block(node)
             blocks.append(block)
-            source_type = "skill_yaml" if node.skill_yaml_path is not None and node.skill_yaml_path.exists() else "skill_md"
+            source_type = node.metadata_source or "skill_md"
             source_path = node.skill_yaml_path if source_type == "skill_yaml" else node.skill_md_path
             sources.append(AgentContextSource(slug=node.slug, source_type=source_type, source_path=source_path))
         for message in node.validation_messages:

@@ -38,7 +38,7 @@ def test_cli_context_outputs_skill_md_fallback(tmp_path: Path, capsys) -> None:
     code = main(["context", "--workspace", str(tmp_path)])
     assert code == 0
     out = capsys.readouterr().out
-    assert "source: SKILL.md" in out
+    assert "path: python" in out
     assert "Use this." in out
 
 
@@ -51,3 +51,17 @@ def test_cli_help(capsys) -> None:
     assert "discover" in out
     assert "validate" in out
     assert "context" in out
+
+
+def test_cli_context_uses_frontmatter_metadata(tmp_path: Path, capsys) -> None:
+    skills_root = tmp_path / ".skills"
+    write(
+        skills_root / "python" / "SKILL.md",
+        "---\nname: python\ndescription: desc\ntags:\n  - cli\n---\n# Python\n\nUse this.\n",
+    )
+    code = main(["context", "--workspace", str(tmp_path)])
+    assert code == 0
+    out = capsys.readouterr().out
+    assert "name: python" in out
+    assert "description: desc" in out
+    assert "# Python" not in out

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from pathlib import Path
+from typing import Any
 
 import yaml
 
@@ -14,7 +15,7 @@ class SkillParser:
     def parse_node(self, path: Path, parent_slug: str | None) -> SkillNode:
         relative_path = path.relative_to(self.skills_root)
         slug = relative_path.as_posix()
-        metadata = self.parse_metadata(path)
+        metadata, metadata_source, skill_md_body = self.parse_metadata(path)
         references_dir = path / "references" if (path / "references").exists() else None
         examples_dir = path / "examples" if (path / "examples").exists() else None
         scripts_dir = path / "scripts" if (path / "scripts").exists() else None
@@ -26,20 +27,36 @@ class SkillParser:
             relative_path=relative_path,
             parent_slug=parent_slug,
             metadata=metadata,
+            metadata_source=metadata_source,
             skill_md_path=path / "SKILL.md",
             skill_yaml_path=skill_yaml_path,
             references_dir=references_dir,
             examples_dir=examples_dir,
             scripts_dir=scripts_dir,
+            skill_md_body=skill_md_body,
         )
 
-    def parse_metadata(self, path: Path) -> SkillMetadata:
+    def parse_metadata(self, path: Path) -> tuple[SkillMetadata, str | None, str]:
         yaml_path = path / "skill.yaml"
-        if not yaml_path.exists():
-            return SkillMetadata(name=path.name, description="")
-        loaded = yaml.safe_load(yaml_path.read_text(encoding="utf-8")) or {}
-        if not isinstance(loaded, dict):
-            loaded = {}
+        skill_md_path = path / "SKILL.md"
+        try:
+            skill_md_text = skill_md_path.read_text(encoding="utf-8") if skill_md_path.exists() else ""
+        except UnicodeDecodeError:
+            skill_md_text = ""
+        frontmatter = self._parse_frontmatter(skill_md_text)
+        if yaml_path.exists():
+            try:
+                loaded = yaml.safe_load(yaml_path.read_text(encoding="utf-8")) or {}
+            except Exception:
+                loaded = {}
+            if not isinstance(loaded, dict):
+                loaded = {}
+            return self._build_metadata(loaded, path), "skill_yaml", frontmatter["body"]
+        if isinstance(frontmatter["metadata"], dict):
+            return self._build_metadata(frontmatter["metadata"], path), "frontmatter", frontmatter["body"]
+        return SkillMetadata(name=path.name, description=""), None, skill_md_text.strip()
+
+    def _build_metadata(self, loaded: dict[str, Any], path: Path) -> SkillMetadata:
         script_entrypoints = []
         for item in loaded.get("script_entrypoints", []) or []:
             if isinstance(item, dict) and "name" in item and "path" in item:
@@ -64,6 +81,21 @@ class SkillParser:
             references=[str(v) for v in loaded.get("references", []) or []],
             exclusive_with=[str(v) for v in loaded.get("exclusive_with", []) or []],
         )
+
+    def _parse_frontmatter(self, text: str) -> dict[str, Any]:
+        if not text.startswith("---\n"):
+            return {"metadata": None, "body": text.strip(), "has_frontmatter": False}
+        marker = "\n---\n"
+        end = text.find(marker, 4)
+        if end == -1:
+            return {"metadata": None, "body": text.strip(), "has_frontmatter": True}
+        raw = text[4:end]
+        body = text[end + len(marker) :].strip()
+        try:
+            loaded = yaml.safe_load(raw) or {}
+        except Exception:
+            loaded = None
+        return {"metadata": loaded, "body": body, "has_frontmatter": True}
 
     def build_tree(self, nodes: list[SkillNode]) -> SkillTree:
         by_slug = {node.slug: node for node in nodes}

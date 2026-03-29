@@ -56,6 +56,15 @@ def render_yaml_context(yaml_path: Path) -> str:
     return rendered
 
 
+def render_metadata_context(raw: dict[str, Any]) -> str:
+    ordered: dict[str, Any] = {}
+    for field in YAML_CONTEXT_FIELDS:
+        if field in raw:
+            ordered[field] = raw[field]
+    rendered = yaml.safe_dump(ordered, sort_keys=False, default_flow_style=False).strip()
+    return rendered
+
+
 def render_skill_md_context(skill_md_path: Path) -> str:
     return skill_md_path.read_text(encoding="utf-8").strip()
 
@@ -65,7 +74,6 @@ def format_agent_context_text(blocks: list[dict[str, str]], validation_lines: li
     for block in blocks:
         lines.append(f"- {block['name']}")
         lines.append(f"  path: {block['path']}")
-        lines.append(f"  source: {block['source']}")
         context_lines = block["context"].splitlines() or [""]
         if context_lines:
             lines.append(f"  context: {context_lines[0]}")
@@ -82,15 +90,25 @@ def format_agent_context_text(blocks: list[dict[str, str]], validation_lines: li
 
 
 def build_agent_context_block(node: SkillNode) -> dict[str, str]:
-    if node.skill_yaml_path is not None and node.skill_yaml_path.exists():
+    if node.metadata_source == "skill_yaml" and node.skill_yaml_path is not None and node.skill_yaml_path.exists():
         context = render_yaml_context(node.skill_yaml_path)
-        source = "skill.yaml"
+    elif node.metadata_source == "frontmatter":
+        context = render_metadata_context(_load_frontmatter_metadata(node.skill_md_path))
     else:
         context = render_skill_md_context(node.skill_md_path)
-        source = "SKILL.md"
     return {
         "name": node.slug,
         "path": node.slug,
-        "source": source,
         "context": context,
     }
+
+
+def _load_frontmatter_metadata(skill_md_path: Path) -> dict[str, Any]:
+    text = skill_md_path.read_text(encoding="utf-8")
+    if not text.startswith("---\n"):
+        return {}
+    end = text.find("\n---\n", 4)
+    if end == -1:
+        return {}
+    loaded = yaml.safe_load(text[4:end]) or {}
+    return loaded if isinstance(loaded, dict) else {}

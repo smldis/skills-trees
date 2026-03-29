@@ -37,11 +37,13 @@ class SkillNode:
     relative_path: Path
     parent_slug: str | None
     metadata: SkillMetadata
+    metadata_source: str | None
     skill_md_path: Path
     skill_yaml_path: Path | None
     references_dir: Path | None
     examples_dir: Path | None
     scripts_dir: Path | None
+    skill_md_body: str = ""
     children: list[str] = field(default_factory=list)
     is_valid: bool = True
     validation_messages: list[ValidationMessage] = field(default_factory=list)
